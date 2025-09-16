@@ -22,6 +22,7 @@ params.clair3_threads = 1
 params.skip_trimming = false
 params.skip_alignment = false
 params.skip_duplicate_marking = false
+params.fallback_to_alignment = true  // Add this parameter
 params.help = false
 
 def helpMessage() {
@@ -44,6 +45,7 @@ def helpMessage() {
       --skip_alignment  Skip alignment (use existing BAMs)
       --results         Output directory (default: results)
       --skip_duplicate_marking  Skip duplicate marking step
+      --fallback_to_alignment   Fall back to alignment if BAMs not found (default: true)
     
     """.stripIndent()
 }
@@ -60,7 +62,35 @@ include { VCFStats } from './modules/call_stats.nf'
 include { Filter_Variants } from './modules/filter_variants.nf'
 include { MultiQC_Report } from './modules/multiqc.nf'
 
-
+// Function to check if we should actually skip alignment
+def shouldSkipAlignment() {
+    if (!params.skip_alignment) {
+        return false
+    }
+    
+    def bamDir = file(params.aligned)
+    if (!bamDir.exists()) {
+        if (params.fallback_to_alignment) {
+            log.warn "BAM directory ${params.aligned} does not exist! Will perform alignment instead."
+            return false
+        } else {
+            error "BAM directory ${params.aligned} does not exist and fallback_to_alignment is disabled!"
+        }
+    }
+    
+    // Check if there are actually BAM files
+    def bamFiles = bamDir.listFiles().findAll { it.name.endsWith('.bam') }
+    if (bamFiles.isEmpty()) {
+        if (params.fallback_to_alignment) {
+            log.warn "No BAM files found in ${params.aligned}! Will perform alignment instead."
+            return false
+        } else {
+            error "No BAM files found in ${params.aligned} and fallback_to_alignment is disabled!"
+        }
+    }
+    
+    return true
+}
 
 // Workflow definition
 workflow {
@@ -71,10 +101,16 @@ workflow {
 
     // Quality control and reference indexing (always run)
     qc_ch = Quality_Control_Raw(fastq_ch, params.qc_before_trim)
-    ref_idx = Index_Reference(ref_ch)
     
-    // Only create minimap index if we're doing alignment
-    if (!params.skip_alignment) {
+    // Index_Reference now returns a tuple: (fai_file, dict_file)
+    ref_idx_tuple = Index_Reference(ref_ch)
+    ref_fai_ch = ref_idx_tuple.map { fai, _dict -> fai }  // Extract just the .fai file
+    
+    // Determine if we should actually skip alignment
+    def actuallySkipAlignment = shouldSkipAlignment()
+    
+    // Create minimap index if we're doing alignment
+    if (!actuallySkipAlignment) {
         mmi_idx = Minimap_Index(ref_ch)
     }
 
@@ -89,31 +125,13 @@ workflow {
         trimmed_qc_ch = Quality_Control_Trimmed(trimmed_fastq_ch, params.qc_after_trim)
     }
 
-    // BAM handling - improved logic with better debugging
-    if (params.skip_alignment) {
-        log.info "Skipping alignment - looking for existing BAM files in: ${params.aligned}"
+    // BAM handling - cleaner logic
+    if (actuallySkipAlignment) {
+        log.info "Using existing BAM files from: ${params.aligned}"
         
-        // First, let's see what files actually exist
-        def bamDir = file(params.aligned)
-        if (!bamDir.exists()) {
-            error "BAM directory ${params.aligned} does not exist!"
-        }
-        
-        // Create a channel for existing BAM files with better error handling
-        existing_bam_ch = Channel.fromPath("${params.aligned}/*.bam", checkIfExists: false)
-            .ifEmpty { 
-                log.error "No BAM files found in ${params.aligned}"
-                log.error "Available files in directory:"
-                try {
-                    file(params.aligned).listFiles().each { 
-                        log.error "  - ${it.name}" 
-                    }
-                } catch (Exception e) {
-                    log.error "Could not list directory contents: ${e.message}"
-                }
-                error "No BAM files found in ${params.aligned} but alignment was skipped" 
-            }
-            .map { bam -> 
+        // Create a channel for existing BAM files
+        existing_bam_ch = Channel.fromPath("${params.aligned}/*.bam", checkIfExists: true)
+            .map { bam ->
                 log.info "Processing existing BAM file: ${bam.name}"
                 def bai_paths = [
                     file("${bam}.bai"),                           // standard .bam.bai
@@ -137,24 +155,28 @@ workflow {
         log.info "Performing alignment with minimap2"
         
         // Check for existing BAMs that we can reuse
-        existing_bam_ch = Channel.fromPath("${params.aligned}/*.bam", checkIfExists: false)
-            .map { bam -> 
-                def bai_paths = [
-                    file("${bam}.bai"),
-                    file("${bam.toString().replaceAll(/\.bam$/, '.bai')}")
-                ]
-                
-                def bai = bai_paths.find { it.exists() }
-                if (bai) {
-                    log.info "Found existing indexed BAM: ${bam.name}"
-                    return tuple(bam, bai)
-                } else {
-                    log.warn "Found BAM without index: ${bam.name} - will skip"
-                    return null
+        existing_bam_ch = Channel.empty()
+        if (file(params.aligned).exists()) {
+            existing_bam_ch = Channel.fromPath("${params.aligned}/*.bam", checkIfExists: false)
+                .map { bam ->
+                    def bai_paths = [
+                        file("${bam}.bai"),
+                        file("${bam.toString().replaceAll(/\.bam$/, '.bai')}")
+                    ]
+                    
+                    def bai = bai_paths.find { it.exists() }
+                    if (bai) {
+                        log.info "Found existing indexed BAM: ${bam.name}"
+                        return tuple(bam, bai)
+                    } else {
+                        log.warn "Found BAM without index: ${bam.name} - will skip"
+                        return null
+                    }
                 }
-            }
-            .filter { it != null }
-
+                .filter { it != null }
+        }
+        
+        // Perform new alignment
         new_bam_ch = AlignReads(trimmed_fastq_ch, mmi_idx)
         
         // Use cached BAMs if available, otherwise use new BAMs
@@ -167,13 +189,11 @@ workflow {
         md_ch = aln_ch
     } else {
         log.info "Marking duplicates"
-        md_ch = MarkDuplicates(aln_ch)
+        md_output = MarkDuplicates(aln_ch)
+        md_ch = md_output[0]
     }
 
-    // Prepare reference files for variant calling
-    ref_fai_ch = ref_idx[0]
-
-    // Variant calling
+    // Variant calling - FIXED: Properly handle the reference index
     log.info "Starting variant calling with Clair3"
     vc_ch = VariantCalling(
         md_ch,
@@ -187,7 +207,8 @@ workflow {
     Filter_Variants(vc_ch[1], vc_ch[2])
 
     // Apply collect to the channel variables, not directly on ProcessName.out
-    ignore  = qc_ch[2].collect()
+    ignore = qc_ch[2].collect()
     ignore = vcf_stats_ch[0].collect()
     ignore = trimmed_qc_ch[2].collect()
+
 }

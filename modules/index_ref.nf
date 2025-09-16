@@ -10,9 +10,8 @@ process Index_Reference {
         path ref
 
         output:
-        path "*.fai"
-        path "*.dict"
-
+        tuple path ("*.fai"), path ("*.dict")
+        
         script:
         """
         samtools faidx $ref
