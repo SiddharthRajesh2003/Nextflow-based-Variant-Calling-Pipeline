@@ -25,6 +25,8 @@ process VariantCalling {
         
         # Create output directory
         mkdir -p ${sample_name}_clair3
+
+        grep -v "^Y" ${ref_fai} | cut -f1,2 | awk 'BEGIN{OFS="\\t"} {print \$1, "0", \$2}' > exclude_y.bed
         
         # Run Clair3 with Python instead of PyPy
         run_clair3.sh \\
@@ -36,6 +38,7 @@ process VariantCalling {
             --output ${sample_name}_clair3 \\
             --include_all_ctgs \\
             --haploid_precise \\
+            --bed_fn=exclude_y.bed \\
             --print_ref_calls \\
             --python=python3 \\
             --pypy=python3
