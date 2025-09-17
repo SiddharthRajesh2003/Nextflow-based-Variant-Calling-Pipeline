@@ -129,6 +129,17 @@ def shouldSkipDuplicateMarking() {
 
 // Workflow definition
 workflow {
+    if (params.help) {
+    helpMessage()
+    System.exit(0)
+    }
+
+    if (!params.fastq || !params.ref) {
+    log.error "ERROR: Please provide required parameters --fastq and --ref"
+    helpMessage()
+    exit 1
+    }
+
     // Input channels
     fastq_ch = Channel.fromPath(params.fastq)
     ref_ch   = Channel.fromPath(params.ref)

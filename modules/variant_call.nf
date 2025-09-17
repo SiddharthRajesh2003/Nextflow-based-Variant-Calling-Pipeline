@@ -26,7 +26,7 @@ process VariantCalling {
         # Create output directory
         mkdir -p ${sample_name}_clair3
 
-        grep -E "^[0-9]+$|^X$|^MT$|^chr[0-9]+$|^chrX$|^chrMT$" ${ref_fai} | cut -f1,2 | awk 'BEGIN{OFS="\t"} {print $1, "0", $2}' > main_chromosomes_only.bed
+        grep -E '^[0-9]+\$|^X\$|^MT\$|^chr[0-9]+\$|^chrX\$|^chrMT\$' ${ref_fai} | cut -f1,2 | awk 'BEGIN{OFS="\\t"} {print \$1, "0", \$2}' > main_chromosomes_only.bed
         
         # Run Clair3 with Python instead of PyPy
         run_clair3.sh \\
@@ -36,9 +36,7 @@ process VariantCalling {
             --platform ${params.platform} \\
             --model_path ${model_dir} \\
             --output ${sample_name}_clair3 \\
-            --include_all_ctgs \\
             --haploid_precise \\
-            --bed_fn=main_chromosomes_only.bed \\
             --print_ref_calls \\
             --python=python3 \\
             --pypy=python3
