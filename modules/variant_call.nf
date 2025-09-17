@@ -26,16 +26,26 @@ process VariantCalling {
         # Create output directory
         mkdir -p ${sample_name}_clair3
 
-        grep -E '^[0-9]+\$|^X\$|^MT\$|^chr[0-9]+\$|^chrX\$|^chrMT\$' ${ref_fai} | cut -f1,2 | awk 'BEGIN{OFS="\\t"} {print \$1, "0", \$2}' > main_chromosomes_only.bed
+        # For female sample: exclude Y chromosome and problematic contigs
+        # Create bed file for chromosomes 1-22, X (excluding Y, GL*, KI*, MT)
+
+        awk '\$1 ~ /^(chr)?([1-9]|1[0-9]|2[0-2]|X)\$/ {print \$1"\\t0\\t"\$2}' ${ref_fai} > female_chromosomes.bed
         
-        # Run Clair3 with Python instead of PyPy
+        # Debug: Show what regions we're processing
+        
+        echo "=== Chromosomes to process (female sample) ===" >&2
+        cat female_chromosomes.bed >&2
+        echo "Total regions: \$(wc -l < female_chromosomes.bed)" >&2
+        
+        # Run Clair3 with proper parameter format (using = signs)
         run_clair3.sh \\
-            -b ${bam} \\
-            -f ${ref} \\
-            --threads ${params.clair3_threads} \\
-            --platform ${params.platform} \\
-            --model_path ${model_dir} \\
-            --output ${sample_name}_clair3 \\
+            --bam_fn=${bam} \\
+            --ref_fn=${ref} \\
+            --threads=${params.clair3_threads} \\
+            --platform=${params.platform} \\
+            --model_path=${model_dir} \\
+            --output=${sample_name}_clair3 \\
+            --bed_fn=female_chromosomes.bed \\
             --haploid_precise \\
             --print_ref_calls \\
             --python=python3 \\
