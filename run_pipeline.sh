@@ -48,7 +48,7 @@ echo "Starting pipeline execution..."
 
 # Run Nextflow pipeline (fixed duplicate report options)
 nextflow run workflow.nf \
-    --aligned /N/project/Krolab/Siddharth/Personal/DNA-seq/results/bam \
+    -profile slurm \
     -resume \
     -with-timeline ${OUTPUT_DIR}/pipeline_info/execution_timeline_${SLURM_JOB_ID}.html \
     -with-report ${OUTPUT_DIR}/pipeline_info/execution_report_${SLURM_JOB_ID}.html \

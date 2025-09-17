@@ -16,7 +16,8 @@ params.logs_dir="${params.base}/logs_dir"
 params.apps="${params.base}/Apps"
 params.model_dir="${params.apps}/clair3_models/r941_prom_sup_g5014"
 params.platform = "ont"  // Change to "hifi" for PacBio
-params.clair3_threads = 1
+params.clair3_threads = 8
+params.clair3_chunk_size = 5000000
 
 // Additional useful parameters
 params.skip_trimming = false

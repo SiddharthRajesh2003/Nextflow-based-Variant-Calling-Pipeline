@@ -45,6 +45,7 @@ process VariantCalling {
             --platform=${params.platform} \\
             --model_path=${model_dir} \\
             --output=${sample_name}_clair3 \\
+            --chunk_size=${params.clair3_chunk_size} \\
             --bed_fn=female_chromosomes.bed \\
             --haploid_precise \\
             --print_ref_calls \\
