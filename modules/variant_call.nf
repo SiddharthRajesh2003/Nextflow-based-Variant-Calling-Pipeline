@@ -12,9 +12,9 @@ process VariantCalling {
         path model_dir
         
         output:
-        path "${bam.baseName}_clair3/"
-        path "${bam.baseName}_clair3/merge_output.vcf.gz"
-        path "${bam.baseName}_clair3/merge_output.vcf.gz.tbi"
+        path "${bam.baseName.replaceAll('_marked_duplicates', '')}_clair3/"
+        path "${bam.baseName.replaceAll('_marked_duplicates', '')}_clair3/merge_output.vcf.gz"
+        path "${bam.baseName.replaceAll('_marked_duplicates', '')}_clair3/merge_output.vcf.gz.tbi"
         
         script:
         def sample_name = bam.baseName.replaceAll('_marked_duplicates', '')
