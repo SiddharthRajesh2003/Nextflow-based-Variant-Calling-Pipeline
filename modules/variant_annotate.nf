@@ -1,5 +1,4 @@
 #!usr/bin/env nextflow
-
 nextflow.enable.dsl = 2
 
 process AnnotateVariants {
@@ -13,10 +12,10 @@ process AnnotateVariants {
     path ref_fai
 
     output:
-    tuple path("*_annotated.vcf.gz"), path("*_annotated.vcf.gz.tbi"), emit: annotated_vcf
-    path "*_vep_summary.html", emit: vep_report
-    path "*_vep_stats.txt", emit: vep_stats
-    path "*.log", emit: logs
+    tuple path("*_annotated.vcf.gz"), path("*_annotated.vcf.gz.tbi")
+    path "*_vep_summary.html"
+    path "*_vep_stats.txt"
+    path "*.log"
 
     script:
     def sample_name = vcf.baseName.replaceAll(/(_filtered)?\.vcf(\.gz)?$/, '')
@@ -35,7 +34,7 @@ process AnnotateVariants {
         --species homo_sapiens \\
         --assembly ${params.genome_build ?: 'GRCh38'} \\
         ${cache_dir} \\
-        ${ref} \\
+        --fasta ${ref} \\
         --offline \\
         --cache \\
         --merged \\
@@ -57,7 +56,7 @@ process AnnotateVariants {
 
     # Index the annotated VCF
     tabix -p vcf ${sample_name}_annotated.vcf.gz
-    
+        
     # Log completion
     echo "VEP annotation completed for ${sample_name}" > ${sample_name}_vep_completion.log
     """

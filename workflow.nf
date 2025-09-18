@@ -14,10 +14,18 @@ params.aligned="${params.results}/bam"
 params.vcf="${params.results}/vcf"
 params.logs_dir="${params.base}/logs_dir"
 params.apps="${params.base}/Apps"
+
+// Clair3-specific parameters
 params.model_dir="${params.apps}/clair3_models/r941_prom_sup_g5014"
 params.platform = "ont"  // Change to "hifi" for PacBio
 params.clair3_threads = 8
 params.clair3_chunk_size = 5000000
+
+// VEP-specific parameters (ADDED)
+params.vep_threads = 8
+params.genome_build = "GRCh38"
+params.vep_cache_dir = "${params.base}/vep_cache"  // Define your VEP cache directory
+
 
 // Additional useful parameters
 params.skip_trimming = false
@@ -309,7 +317,7 @@ workflow {
     filtered_vcf_ch = Filter_Variants(vc_ch[1], vc_ch[2])
 
     annotated_vcf_ch = AnnotateVariants(filtered_vcf_ch,
-        vep_cache_dir: params.vep_cache_dir ?: null,
+        vep_cache_dir: params.vep_cache_dir,
         ref_ch,
         ref_fai_ch)
 
