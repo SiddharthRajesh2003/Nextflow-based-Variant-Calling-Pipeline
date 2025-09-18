@@ -19,6 +19,7 @@ nf-DNA-seq/
     ├── multiqc.nf
     ├── trim.nf
     ├── qc.nf
+    ├── variant_annotate.nf
     └── variant_call.nf
 ```
 
@@ -72,6 +73,8 @@ Or, using conda:
 
 ```bash
 conda install -c bioconda clair3 nanoplot multiqc nextflow nf-core nanofilt
+conda install -c conda-forge graphviz
+pip install "tensorflow==2.10.1" "keras==2.10.0"
 ```
 
 > **Note:**  
@@ -86,7 +89,7 @@ conda install -c bioconda clair3 nanoplot multiqc nextflow nf-core nanofilt
 
 1. **Clone the repository:**
    ```bash
-   git clone <repo_url>
+   git clone https://github.com/SiddharthRajesh2003/Nextflow-based-Variant-Calling-Pipeline.git
    cd nf-DNA-seq
    ```
 1. **Make sure that your HPC contains tools like GATK, samtools etc.**
