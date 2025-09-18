@@ -64,6 +64,7 @@ include { VariantCalling } from './modules/variant_call.nf'
 include { VCFStats } from './modules/call_stats.nf'
 include { Filter_Variants } from './modules/filter_variants.nf'
 include { MultiQC_Report } from './modules/multiqc.nf'
+include { AnnotateVariants } from './modules/variant_annotate.nf'
 
 // Function to check if we should actually skip alignment
 def shouldSkipAlignment() {
@@ -113,7 +114,7 @@ def shouldSkipDuplicateMarking() {
     
     // Check if there are actually duplicate-marked BAM files
     def dupMarkedFiles = bamDir.listFiles().findAll { 
-        it.name.endsWith('.bam') && (it.name.contains('_marked') || it.name.contains('_dedup') || it.name.contains('duplicates_marked'))
+        it.name.endsWith('.bam') && (it.name.contains('_marked') || it.name.contains('_dedup') || it.name.contains('duplicates_marked') || it.name.contains('marked_duplicates'))
     }
     if (dupMarkedFiles.isEmpty()) {
         if (params.fallback_to_duplicate_marking) {
@@ -305,11 +306,17 @@ workflow {
 
     // Downstream analysis
     vcf_stats_ch = VCFStats(vc_ch[1])
-    Filter_Variants(vc_ch[1], vc_ch[2])
+    filtered_vcf_ch = Filter_Variants(vc_ch[1], vc_ch[2])
+
+    annotated_vcf_ch = AnnotateVariants(filtered_vcf_ch,
+        vep_cache_dir: params.vep_cache_dir ?: null,
+        ref_ch,
+        ref_fai_ch)
 
     // Apply collect to the channel variables, not directly on ProcessName.out
     ignore = qc_ch[2].collect()
     ignore = vcf_stats_ch[0].collect()
     ignore = trimmed_qc_ch[2].collect()
+    ignore = annotated_vcf_ch.collect()
 
 }

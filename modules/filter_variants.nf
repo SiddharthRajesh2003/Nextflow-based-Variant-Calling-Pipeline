@@ -11,8 +11,7 @@ process Filter_Variants {
     path vcf_index
     
     output:
-    path "*_filtered.vcf.gz"
-    path "*_filtered.vcf.gz.tbi"
+    tuple path ("*_filtered.vcf.gz"), path ("*_filtered.vcf.gz.tbi")
     
     script:
     def sample_name = vcf.baseName.replaceAll('\\.merge_output\\.vcf.*', '')

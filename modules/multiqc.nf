@@ -9,6 +9,7 @@ process MultiQC_Report {
     input:
     path fastqc_files
     path stats_files
+    path vcf_files
     
     output:
     path "multiqc_report.html"
