@@ -43,6 +43,9 @@ nf-DNA-seq/
 5. **Variant Filtering (`filter_variants.nf`, `bcftools`)**
    Filters called variants based on quality and other metrics.
 
+5. **Variant Annotation (`variant_annotate.nf`, `vep`)**
+   Annotates variants using VEP (Variant Effect Predictor).
+
 6. **Statistics (`call_stats.nf`, `bcftools`)**
    Generates summary statistics.
 
@@ -105,6 +108,7 @@ pip install "tensorflow==2.10.1" "keras==2.10.0"
 
 3. **Prepare your data:**
    - Place your reference genome and sequencing reads in the appropriate directories.
+   - Use [download.sh](download.sh) to fetch SRA and reference files.
 
 4. **Run the pipeline:**
    ```bash
@@ -124,7 +128,9 @@ Results will be saved in the specified output directory, including:
 - Aligned BAM files
 - QC reports
 - Variant call files (VCF)
+- Summary Statistics
 - Filtered variants
+- Annotated Variants
 - MultiQC summary reports
 
 ## Troubleshooting
