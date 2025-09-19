@@ -539,9 +539,9 @@ workflow {
         ref_fai_ch)
 
     // Apply collect to the channel variables, not directly on ProcessName.out
-    ignore = qc_ch[2].collect()
-    ignore = vcf_stats_ch[0].collect()
-    ignore = trimmed_qc_ch[2].collect()
+    ignore = qc_ch.collect()
+    ignore = vcf_stats_ch.collect()
+    ignore = trimmed_qc_ch.collect()
     ignore = annotated_vcf_ch.collect()
 
 }
