@@ -12,9 +12,8 @@ process VariantCalling {
         path model_dir
         
         output:
+        tuple path("${bam.baseName.replaceAll('_marked_duplicates', '')}_clair3/merge_output.vcf.gz"), path("${bam.baseName.replaceAll('_marked_duplicates', '')}_clair3/merge_output.vcf.gz.tbi")
         path "${bam.baseName.replaceAll('_marked_duplicates', '')}_clair3/"
-        path "${bam.baseName.replaceAll('_marked_duplicates', '')}_clair3/merge_output.vcf.gz"
-        path "${bam.baseName.replaceAll('_marked_duplicates', '')}_clair3/merge_output.vcf.gz.tbi"
         
         script:
         def sample_name = bam.baseName.replaceAll('_marked_duplicates', '')
@@ -29,8 +28,14 @@ process VariantCalling {
         # For female sample: exclude Y chromosome and problematic contigs
         # Create bed file for chromosomes 1-22, X (excluding Y, GL*, KI*, MT)
 
-        awk '\$1 ~ /^(chr)?([1-9]|1[0-9]|2[0-2]|X)\$/ {print \$1"\\t0\\t"\$2}' ${ref_fai} > female_chromosomes.bed
-        
+        if [ "${params.is_female}" = "true" ]; then
+            echo "Processing female sample - excluding Y chromosome" >&2
+            awk '\$1 ~ /^(chr)?([1-9]|1[0-9]|2[0-2]|X)\$/ {print \$1"\\t0\\t"\$2}' ${ref_fai} > chromosomes.bed
+        else
+            echo "Processing Male sample - including Y chromosome" >&2
+            awk '\$1 ~ /^(chr)?([1-9]|1[0-9]|2[0-2]|X|Y)\$/ {print \$1"\\t0\\t"\$2}' ${ref_fai} > chromosomes.bed
+        fi
+
         # Debug: Show what regions we're processing
         
         echo "=== Chromosomes to process (female sample) ===" >&2
@@ -46,7 +51,7 @@ process VariantCalling {
             --model_path=${model_dir} \\
             --output=${sample_name}_clair3 \\
             --chunk_size=${params.clair3_chunk_size} \\
-            --bed_fn=female_chromosomes.bed \\
+            --bed_fn=chromosomes.bed \\
             --haploid_precise \\
             --print_ref_calls \\
             --python=python3 \\

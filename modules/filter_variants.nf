@@ -7,8 +7,7 @@ process Filter_Variants {
     publishDir "${params.vcf}/filtered", mode: 'copy'
     
     input:
-    path vcf
-    path vcf_index
+    tuple path (vcf), path (vcf_index)
     
     output:
     tuple path ("*_filtered.vcf.gz"), path ("*_filtered.vcf.gz.tbi")

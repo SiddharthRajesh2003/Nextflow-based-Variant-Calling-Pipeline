@@ -20,6 +20,7 @@ params.model_dir="${params.apps}/clair3_models/r941_prom_sup_g5014"
 params.platform = "ont"  // Change to "hifi" for PacBio
 params.clair3_threads = 8
 params.clair3_chunk_size = 5000000
+params.is_female = false // For female samples, set to true to exclude Y chromosome
 
 // VEP-specific parameters (ADDED)
 params.vep_threads = 8
@@ -34,6 +35,11 @@ params.skip_duplicate_marking = false
 params.fallback_to_alignment = true  // Add this parameter
 params.help = false
 params.fallback_to_duplicate_marking = true  // Add this parameter for consistency
+params.skip_variant_calling = false
+params.skip_variant_filtering = false
+params.fallback_to_variant_calling = true
+params.fallback_to_variant_filtering = true
+
 
 def helpMessage() {
     log.info"""
@@ -49,14 +55,18 @@ def helpMessage() {
       --ref             Path to reference genome FASTA
     
     Optional parameters:
-      --platform        Sequencing platform [ont/hifi] (default: ont)
-      --clair3_threads  Threads for Clair3 (default: 16)
-      --skip_trimming   Skip read trimming step
-      --skip_alignment  Skip alignment (use existing BAMs)
-      --skip_duplicate_marking  Skip duplicate marking step
+      --platform                        Sequencing platform [ont/hifi] (default: ont)
+      --clair3_threads                  Threads for Clair3 (default: 16)
+      --skip_trimming                   Skip read trimming step
+      --skip_alignment                  Skip alignment (use existing BAMs)
+      --skip_duplicate_marking          Skip duplicate marking step(default: false)
+      --skip_variant_calling            Skip Variant Calling step(default: false)
+      --skip_variant_filtering          Skip Variant Filtering step(default: false)
       --fallback_to_duplicate_marking   Fall back to duplicate marking if marked BAMs not found (default: true)
-      --results         Output directory (default: results)
-      --fallback_to_alignment   Fall back to alignment if BAMs not found (default: true)
+      --fallback_to_alignment           Fall back to alignment if BAMs not found (default: true)
+      --fallback_to_variant_calling     Fall back to variant calling if VCFs not found (default: true)
+      --fallback_to_variant_filtering   Fall back to variant filtering if filtered VCFs not found (default: true
+      --results                         Output directory (default: results)
     
     """.stripIndent()
 }
@@ -136,6 +146,87 @@ def shouldSkipDuplicateMarking() {
     return true
 }
 
+def shouldSkipVariantCalling() {
+    if (!params.skip_variant_calling) {
+        return false
+    }
+
+    def vcfDir = file(params.vcf)
+    if (!vcfDir.exists()) {
+        if (params.fallback_to_variant_calling) {
+            log.warn "VCF directory ${params.vcf} does not exist! Will perform variant calling instead."
+            return false
+        } else {
+            error "VCF directory ${params.vcf} does not exist and fallback_to_variant_calling is disabled!"
+        }
+    }
+
+    // Look for Clair3 output directories (SRR*_clair3)
+    def clair3Dirs = vcfDir.listFiles().findAll { 
+        it.isDirectory() && it.name.matches(/.*_clair3/) 
+    }
+    
+    if (clair3Dirs.isEmpty()) {
+        if (params.fallback_to_variant_calling) {
+            log.warn "No Clair3 output directories found in ${params.vcf}! Will perform variant calling instead."
+            return false
+        } else {
+            error "No Clair3 output directories found in ${params.vcf} and fallback_to_variant_calling is disabled!"
+        }
+    }
+    
+    // Check if VCF files exist within the Clair3 directories
+    def vcfFiles = []
+    clair3Dirs.each { dir ->
+        def dirVcfFiles = dir.listFiles().findAll {
+            it.name.equals('merge_output.vcf.gz') || it.name.equals('merge_output.vcf')
+        }
+        vcfFiles.addAll(dirVcfFiles)
+        log.info "Found ${dirVcfFiles.size()} VCF files in ${dir.name}"
+    }
+    
+    if (vcfFiles.isEmpty()) {
+        if (params.fallback_to_variant_calling) {
+            log.warn "No merge_output.vcf(.gz) files found in Clair3 directories! Will perform variant calling instead."
+            return false
+        } else {
+            error "No merge_output.vcf(.gz) files found in Clair3 directories and fallback_to_variant_calling is disabled!"
+        }
+    }
+    
+    log.info "Found ${vcfFiles.size()} existing Clair3 VCF files in ${clair3Dirs.size()} directories"
+    return true
+}
+
+def shouldSkipVariantFiltering() {
+    if (!params.skip_variant_filtering) {
+        return false
+    }
+
+    def vcfDir = file("${params.vcf}/filtered")
+    if (!vcfDir.exists()) {
+        if (params.fallback_to_variant_filtering) {
+            log.warn "VCF directory ${params.vcf}/filtered does not exist! Will perform variant calling instead."
+            return false
+        } else {
+            error "VCF directory ${params.vcf}/filtered does not exist and fallback_to_variant_filtering is disabled!"
+        }
+    }
+
+    def vcfFiles = vcfDir.listFiles().findAll {
+        it.name.endsWith('.vcf') || it.name.endsWith('.vcf.gz')
+    }
+    if (vcfFiles.isEmpty()) {
+        if (params.fallback_to_variant_filtering) {
+            log.warn "No VCF files found in ${params.vcf}/filtered! Will perform variant calling instead."
+            return false
+        } else {
+            error "No VCF files found in ${params.vcf}/filtered and fallback_to_variant_filtering is disabled!"
+        }
+    }
+
+    return true
+}
 
 // Workflow definition
 workflow {
@@ -305,19 +396,135 @@ workflow {
 
     // Variant calling - FIXED: Properly handle the reference index
     log.info "Starting variant calling with Clair3"
-    vc_ch = VariantCalling(
-        md_ch,
-        ref_ch,
-        ref_fai_ch,
-        model_dir_ch
-    )
+    def actuallySkipVariantCalling = shouldSkipVariantCalling()
+
+        if (actuallySkipVariantCalling) {
+            log.info "Using existing VCF files from Clair3 directories in: ${params.vcf}"
+
+            // Look for VCF files in Clair3 subdirectories
+            existing_vcf_ch = Channel.fromPath("${params.vcf}/*_clair3/merge_output.vcf.gz", checkIfExists: true)
+                .map { vcf ->
+                    log.info "Found existing Clair3 VCF file: ${vcf}"
+                    def tbi_paths = [
+                        file("${vcf}.tbi"),
+                        file("${vcf.toString().replaceAll(/\.vcf\.gz$/, '.vcf.gz.tbi')}")
+                    ]
+                    def tbi = tbi_paths.find { it.exists() }
+                    if (tbi) {
+                        log.info "Found index for VCF ${vcf.name}: ${tbi.name}"
+                        return tuple(vcf, tbi)
+                    } else {
+                        log.error "Index file not found for VCF ${vcf.name}"
+                        log.error "Looked for: ${tbi_paths.collect{it.toString()}.join(', ')}"
+                        error "Index file not found for VCF ${vcf.name}. Please ensure VCF files are properly indexed."
+                    }
+                }
+
+        vc_ch = existing_vcf_ch
+    } else {
+        log.info "Performing Variant Calling with Clair3"
+
+        // Look for existing Clair3 VCFs to potentially reuse
+        existing_vcf_ch = Channel.empty()
+        if (file(params.vcf).exists()) {
+            existing_vcf_ch = Channel.fromPath("${params.vcf}/*_clair3/merge_output.vcf.gz", checkIfExists: false)
+                .map { vcf -> 
+                    def tbi_paths = [
+                        file("${vcf}.tbi"),
+                        file("${vcf.toString().replaceAll(/\.vcf\.gz$/, '.vcf.gz.tbi')}")
+                    ]
+                    def tbi = tbi_paths.find { it.exists() }
+                    if (tbi) {
+                        log.info "Found existing indexed Clair3 VCF: ${vcf.name}"
+                        return tuple(vcf, tbi)
+                    } else {
+                        log.warn "Found Clair3 VCF without index: ${vcf.name} - will skip"
+                        return null
+                    }
+                }
+                .filter { it != null }
+        }
+
+        // Perform new variant calling
+        new_vcf_ch = VariantCalling(
+            md_ch,
+            ref_ch,
+            ref_fai_ch,
+            model_dir_ch
+        )
+        vcf_output = new_vcf_ch
+        new_vcf_only_ch = vcf_output.map { vcf, tbi -> tuple(vcf, tbi) }
+
+        if (existing_vcf_ch) {
+            vc_ch = existing_vcf_ch.mix(new_vcf_only_ch)
+        } else {
+            vc_ch = new_vcf_only_ch
+        }
+    }
+
+    vcf_ch = vc_ch.map { vcf, _tbi -> vcf}
 
     // Downstream analysis
-    vcf_stats_ch = VCFStats(vc_ch[1])
-    filtered_vcf_ch = Filter_Variants(vc_ch[1], vc_ch[2])
+    vcf_stats_ch = VCFStats(vcf_ch)
+
+    def actuallySkipVariantFiltering = shouldSkipVariantFiltering()
+
+    if (actuallySkipVariantFiltering) {
+        log.info "Using existing filtered VCF files from: ${params.vcf}/filtered"
+        
+        existing_filtered_vcf_ch = Channel.fromPath("${params.vcf}/filtered/*.{vcf,vcf.gz}", checkIfExists: true)
+            .map {
+                vcf -> log.info "Found existing filtered VCF file: ${vcf.name}"
+                def tbi_paths = [
+                    file("${vcf}.tbi"),
+                    file("${vcf.toString().replaceAll(/\.vcf(\.gz)?$/, '.tbi')}")
+                ]
+                def tbi = tbi_paths.find {it.exists()}
+                if (tbi) {
+                    log.info "Found index for VCF ${vcf.name}: ${tbi.name}"
+                    return tuple(vcf, tbi)
+                } else {
+                    log.error "Index file not found for VCF ${vcf.name}"
+                    log.error "Looked for: ${tbi_paths.collect{it.toString()}.join(', ')}"
+                    error "Index file not found for VCF files ${vcf.name}. Please ensure VCF files are properly indexed."
+                }
+            }
+            filtered_vcf_ch = existing_filtered_vcf_ch
+    } else {
+        log.info "Filtering variants"
+
+        existing_filtered_vcf_ch = Channel.empty()
+        if (file("${params.vcf}/filtered").exists()) {
+            existing_filtered_vcf_ch = Channel.fromPath("${params.vcf}/filtered/*.{vcf,vcf.gz}", checkIfExists: false)
+                .map { vcf -> 
+                def tbi_paths = [
+                    file("${vcf}.tbi"),
+                    file("${vcf.toString().replaceAll(/\.vcf(\.gz)?$/, '.tbi')}")
+                ]
+                def tbi = tbi_paths.find { it.exists() }
+                if (tbi) {
+                    log.info "Found existing filtered and indexed VCF: ${vcf.name}"
+                    return tuple(vcf, tbi)
+                } else {
+                    log.warn "Found filtered VCF without index: ${vcf.name} - will skip"
+                    return null
+                }
+            }
+            .filter { it!= null }
+        }
+
+        filtered_vcf_output = Filter_Variants(vcf_ch)
+
+        if (existing_filtered_vcf_ch) {
+            filtered_vcf_ch = existing_filtered_vcf_ch.mix(filtered_vcf_output)
+        } else {
+            filtered_vcf_ch = filtered_vcf_output
+        }
+    }
+
 
     annotated_vcf_ch = AnnotateVariants(filtered_vcf_ch,
-        vep_cache_dir: params.vep_cache_dir,
+        params.vep_cache_dir,
         ref_ch,
         ref_fai_ch)
 
