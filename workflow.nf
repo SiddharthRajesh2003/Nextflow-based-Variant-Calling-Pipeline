@@ -20,7 +20,7 @@ params.model_dir="${params.apps}/clair3_models/r941_prom_sup_g5014"
 params.platform = "ont"  // Change to "hifi" for PacBio
 params.clair3_threads = 8
 params.clair3_chunk_size = 5000000
-params.is_female = false // For female samples, set to true to exclude Y chromosome
+params.is_female = true // For female samples, set to true to exclude Y chromosome
 
 // VEP-specific parameters (ADDED)
 params.vep_threads = 8
@@ -446,19 +446,29 @@ workflow {
         }
 
         // Perform new variant calling
-        new_vcf_ch = VariantCalling(
+        clair3_dir_ch = VariantCalling(
             md_ch,
             ref_ch,
             ref_fai_ch,
             model_dir_ch
         )
-        vcf_output = new_vcf_ch
-        new_vcf_only_ch = vcf_output.map { vcf, tbi -> tuple(vcf, tbi) }
+        // Extract VCF and TBI files from the Clair3 directory
+    new_vcf_ch = clair3_dir_ch.map { clair3_dir ->
+            def vcf = file("${clair3_dir}/merge_output.vcf.gz")
+            def tbi = file("${clair3_dir}/merge_output.vcf.gz.tbi")
+            
+            if (vcf.exists() && tbi.exists()) {
+                log.info "Found Clair3 VCF: ${vcf.name} with index: ${tbi.name}"
+                return tuple(vcf, tbi)
+            } else {
+                error "Missing VCF or index file in ${clair3_dir}: VCF exists: ${vcf.exists()}, TBI exists: ${tbi.exists()}"
+            }
+        }
 
         if (existing_vcf_ch) {
-            vc_ch = existing_vcf_ch.mix(new_vcf_only_ch)
+            vc_ch = existing_vcf_ch.mix(new_vcf_ch)
         } else {
-            vc_ch = new_vcf_only_ch
+            vc_ch = new_vcf_ch
         }
     }
 

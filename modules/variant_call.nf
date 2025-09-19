@@ -12,7 +12,6 @@ process VariantCalling {
         path model_dir
         
         output:
-        tuple path("${bam.baseName.replaceAll('_marked_duplicates', '')}_clair3/merge_output.vcf.gz"), path("${bam.baseName.replaceAll('_marked_duplicates', '')}_clair3/merge_output.vcf.gz.tbi")
         path "${bam.baseName.replaceAll('_marked_duplicates', '')}_clair3/"
         
         script:
@@ -39,8 +38,8 @@ process VariantCalling {
         # Debug: Show what regions we're processing
         
         echo "=== Chromosomes to process (female sample) ===" >&2
-        cat female_chromosomes.bed >&2
-        echo "Total regions: \$(wc -l < female_chromosomes.bed)" >&2
+        cat chromosomes.bed >&2
+        echo "Total regions: \$(wc -l < chromosomes.bed)" >&2
         
         # Run Clair3 with proper parameter format (using = signs)
         run_clair3.sh \\
