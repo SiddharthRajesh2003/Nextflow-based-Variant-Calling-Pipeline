@@ -3,3 +3,4 @@ requirements.txt
 netflow.config
 results/
 read_vcf.qmd
+pipeline.tar.gz
