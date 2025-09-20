@@ -19,7 +19,7 @@ process AnnotateVariants {
     path "*.log"
 
     script:
-    def sample_name = vcf.baseName.replaceAll(/(_filtered)?\.vcf(\.gz)?$/, '')
+    def sample_name = vcf.baseName.replaceAll(/(_filtered|_annotated)?\.vcf(\.gz)?$/, '')
     def fork = params.vep_threads ?: 8
     """
     # Set locale to avoid locale errors
