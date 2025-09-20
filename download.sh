@@ -29,6 +29,9 @@ cd $base
 
 mkdir $base/reference
 wget https://ftp.ensembl.org/pub/release-114/fasta/homo_sapiens/dna/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz -C reference/
+gunzip reference/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz
+mv Homo_sapiens.GRCh38.dna.primary_assembly.fa human_ref.fa
+
 
 module load conda
 conda activate <your_env_name>
