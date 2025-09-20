@@ -13,11 +13,11 @@ process Filter_Variants {
     tuple path ("*_filtered.vcf.gz"), path ("*_filtered.vcf.gz.tbi")
     
     script:
-    def sample_name = vcf.baseName.replaceAll('\\.merge_output\\.vcf.*', '')
+    def sample_name = vcf.baseName.replaceAll(/\.vcf(\.gz)?$/, '')
     """
     # Filter variants with quality >= 20 and depth >= 10
     bcftools filter \\
-        -i 'QUAL>=20 && (INFO/DP>=10 || FORMAT/DP>=10)' \\
+        -i 'QUAL>=20 && FORMAT/DP>=10' \\
         -O z \\
         -o ${sample_name}_filtered.vcf.gz \\
         ${vcf}

@@ -247,7 +247,7 @@ workflow {
     model_dir_ch = Channel.fromPath(params.model_dir)
 
     // Quality control and reference indexing (always run)
-    qc_ch = Quality_Control_Raw(fastq_ch, params.qc_before_trim)
+    Quality_Control_Raw(fastq_ch, params.qc_before_trim)
     
     // Index_Reference now returns a tuple: (fai_file, dict_file)
     ref_idx_tuple = Index_Reference(ref_ch)
@@ -453,29 +453,29 @@ workflow {
             model_dir_ch
         )
         // Extract VCF and TBI files from the Clair3 directory
-    new_vcf_ch = clair3_dir_ch.map { clair3_dir ->
-            def vcf = file("${clair3_dir}/merge_output.vcf.gz")
-            def tbi = file("${clair3_dir}/merge_output.vcf.gz.tbi")
-            
-            if (vcf.exists() && tbi.exists()) {
-                log.info "Found Clair3 VCF: ${vcf.name} with index: ${tbi.name}"
-                return tuple(vcf, tbi)
-            } else {
-                error "Missing VCF or index file in ${clair3_dir}: VCF exists: ${vcf.exists()}, TBI exists: ${tbi.exists()}"
+        new_vcf_ch = clair3_dir_ch.map { clair3_dir ->
+                def vcf = file("${clair3_dir}/merge_output.vcf.gz")
+                def tbi = file("${clair3_dir}/merge_output.vcf.gz.tbi")
+                
+                if (vcf.exists() && tbi.exists()) {
+                    log.info "Found Clair3 VCF: ${vcf.name} with index: ${tbi.name}"
+                    return tuple(vcf, tbi)
+                } else {
+                    error "Missing VCF or index file in ${clair3_dir}: VCF exists: ${vcf.exists()}, TBI exists: ${tbi.exists()}"
+                }
             }
-        }
 
-        if (existing_vcf_ch) {
-            vc_ch = existing_vcf_ch.mix(new_vcf_ch)
-        } else {
-            vc_ch = new_vcf_ch
-        }
+            if (existing_vcf_ch) {
+                vc_ch = existing_vcf_ch.mix(new_vcf_ch)
+            } else {
+                vc_ch = new_vcf_ch
+            }
     }
 
     vcf_ch = vc_ch.map { vcf, _tbi -> vcf}
 
     // Downstream analysis
-    vcf_stats_ch = VCFStats(vcf_ch)
+    VCFStats(vcf_ch)
 
     def actuallySkipVariantFiltering = shouldSkipVariantFiltering()
 
@@ -523,7 +523,7 @@ workflow {
             .filter { it!= null }
         }
 
-        filtered_vcf_output = Filter_Variants(vcf_ch)
+        filtered_vcf_output = Filter_Variants(vc_ch)
 
         if (existing_filtered_vcf_ch) {
             filtered_vcf_ch = existing_filtered_vcf_ch.mix(filtered_vcf_output)
@@ -533,15 +533,9 @@ workflow {
     }
 
 
-    annotated_vcf_ch = AnnotateVariants(filtered_vcf_ch,
+    AnnotateVariants(filtered_vcf_ch,
         params.vep_cache_dir,
         ref_ch,
         ref_fai_ch)
-
-    // Apply collect to the channel variables, not directly on ProcessName.out
-    ignore = qc_ch.collect()
-    ignore = vcf_stats_ch.collect()
-    ignore = trimmed_qc_ch.collect()
-    ignore = annotated_vcf_ch.collect()
 
 }

@@ -2,3 +2,4 @@ fastqc.tar.gz
 requirements.txt
 netflow.config
 results/
+read_vcf.qmd

@@ -5,11 +5,11 @@
 #SBATCH -o sra.txt
 #SBATCH -e sra.err
 #SBATCH --mail-type=ALL
-#SBATCH --mail-user=sidrajes@iu.edu
+#SBATCH --mail-user=your_email@example.com
 #SBATCH --nodes=2
 #SBATCH --ntasks-per-node=1
-#SBATCH --time=40:00:00
-#SBATCH --mem=100GB
+#SBATCH --time=10:00:00
+#SBATCH --mem=10GB
 #SBATCH -A r00750
 
 base=/N/project/Krolab/Siddharth/Personal/DNA-seq
@@ -29,3 +29,8 @@ cd $base
 
 mkdir $base/reference
 wget https://ftp.ensembl.org/pub/release-114/fasta/homo_sapiens/dna/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz -C reference/
+
+module load conda
+conda activate <your_env_name>
+
+vep_install -a cf -s homo_sapiens -y GRCh38 -c vep_cache/ --NO_UPDATE
