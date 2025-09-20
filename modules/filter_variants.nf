@@ -3,7 +3,7 @@
 nextflow.enable.dsl=2
 
 process Filter_Variants {
-    tag "Filter high-quality variants"
+    tag "Filter high-quality variants with BCFtools"
     publishDir "${params.vcf}/filtered", mode: 'copy'
     
     input:

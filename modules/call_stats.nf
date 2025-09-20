@@ -3,7 +3,7 @@
 nextflow.enable.dsl=2
 
 process VCFStats {
-    tag "VCF Statistics"
+    tag "VCF Statistics with BCFtools"
     publishDir "${params.vcf}", mode: 'copy'
 
     input:

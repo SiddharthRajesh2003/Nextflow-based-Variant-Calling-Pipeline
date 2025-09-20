@@ -3,7 +3,7 @@
 nextflow.enable.dsl=2
 
 process Quality_Control {
-    tag "Quality Control"
+    tag "Quality Control with NanoPlot"
     publishDir "${qc_dir}", mode: 'copy'
     
     input:

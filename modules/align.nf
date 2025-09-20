@@ -3,7 +3,7 @@
 nextflow.enable.dsl=2
 
 process AlignReads {
-        tag "Aligning the reads to the reference genome"
+        tag "Aligning the reads to the reference genome with Minimap2"
 
         publishDir "${params.aligned}", mode: 'copy'
 

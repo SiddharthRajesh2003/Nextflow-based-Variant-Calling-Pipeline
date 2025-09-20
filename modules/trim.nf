@@ -3,7 +3,7 @@
 nextflow.enable.dsl = 2
 
 process TrimReads {
-    tag "Reads trimming"
+    tag "Reads trimming with NanoFilt"
     publishDir "${params.fastq_dir}", mode:'copy'
 
     input:
