@@ -144,4 +144,7 @@ Results will be saved in the specified output directory, including:
 - [Nextflow Documentation](https://www.nextflow.io/docs/latest/index.html)
 - [Clair3](https://github.com/HKU-BAL/Clair3)
 - [NanoPlot](https://github.com/wdecoster/NanoPlot)
+- [Minimap2](https://github.com/lh3/minimap2)
+- [NanoFilt](https://github.com/wdecoster/nanofilt)
+- [Ensembl VEP](https://github.com/Ensembl/ensembl-vep)
 - [MultiQC](https://multiqc.info/)
