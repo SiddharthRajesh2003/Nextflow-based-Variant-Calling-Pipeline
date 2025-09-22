@@ -40,21 +40,17 @@ process AnnotateVariants {
         --fasta ${ref} \\
         --offline \\
         --cache \\
-        --merged \\
         --everything \\
         --canonical \\
         --biotype \\
         --check_existing \\
         --variant_class \\
-        --regulatory \\
         --protein \\
         --symbol \\
         --numbers \\
         --domains \\
         --total_length \\
         --allele_number \\
-        --no_escape \\
-        --shift_hgvs 1 \\
         --verbose
 
     # Zip the VCF file
