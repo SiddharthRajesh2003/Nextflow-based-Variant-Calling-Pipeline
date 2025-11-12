@@ -242,9 +242,9 @@ workflow {
     }
 
     // Input channels
-    fastq_ch = Channel.fromPath(params.fastq)
-    ref_ch   = Channel.fromPath(params.ref)
-    model_dir_ch = Channel.fromPath(params.model_dir)
+    fastq_ch = channel.fromPath(params.fastq)
+    ref_ch   = channel.fromPath(params.ref)
+    model_dir_ch = channel.fromPath(params.model_dir)
 
     // Quality control and reference indexing (always run)
     Quality_Control_Raw(fastq_ch, params.qc_before_trim)
@@ -266,7 +266,7 @@ workflow {
         log.info "Skipping read trimming - using original FASTQ"
         trimmed_fastq_ch = fastq_ch
         // Skip trimmed QC if we skip trimming
-        trimmed_qc_ch = Channel.empty()
+        trimmed_qc_ch = channel.empty()
     } else {
         trimmed_fastq_ch = TrimReads(fastq_ch)
         trimmed_qc_ch = Quality_Control_Trimmed(trimmed_fastq_ch, params.qc_after_trim)
@@ -277,7 +277,7 @@ workflow {
         log.info "Using existing BAM files from: ${params.aligned}"
         
         // Create a channel for existing BAM files
-        existing_bam_ch = Channel.fromPath("${params.aligned}/*.bam", checkIfExists: true)
+        existing_bam_ch = channel.fromPath("${params.aligned}/*.bam", checkIfExists: true)
             .map { bam ->
                 log.info "Processing existing BAM file: ${bam.name}"
                 def bai_paths = [
@@ -302,9 +302,9 @@ workflow {
         log.info "Performing alignment with minimap2"
         
         // Check for existing BAMs that we can reuse
-        existing_bam_ch = Channel.empty()
+        existing_bam_ch = channel.empty()
         if (file(params.aligned).exists()) {
-            existing_bam_ch = Channel.fromPath("${params.aligned}/*.bam", checkIfExists: false)
+            existing_bam_ch = channel.fromPath("${params.aligned}/*.bam", checkIfExists: false)
                 .map { bam ->
                     def bai_paths = [
                         file("${bam}.bai"),
@@ -337,7 +337,7 @@ workflow {
         log.info "Using existing duplicate-marked BAM files from: ${params.aligned}"
         
         // Create a channel for existing duplicate-marked BAM files
-        existing_dup_marked_ch = Channel.fromPath("${params.aligned}/*{_marked,_dedup,duplicates_marked}*.bam", checkIfExists: true)
+        existing_dup_marked_ch = channel.fromPath("${params.aligned}/*{_marked,_dedup,duplicates_marked}*.bam", checkIfExists: true)
             .map { bam ->
                 log.info "Processing existing duplicate-marked BAM file: ${bam.name}"
                 def bai_paths = [
@@ -362,9 +362,9 @@ workflow {
         log.info "Performing duplicate marking"
         
         // Check for existing duplicate-marked BAMs that we can reuse in the same directory
-        existing_dup_marked_ch = Channel.empty()
+        existing_dup_marked_ch = channel.empty()
         if (file(params.aligned).exists()) {
-            existing_dup_marked_ch = Channel.fromPath("${params.aligned}/*{_marked,_dedup,duplicates_marked}*.bam", checkIfExists: false)
+            existing_dup_marked_ch = channel.fromPath("${params.aligned}/*{_marked,_dedup,duplicates_marked}*.bam", checkIfExists: false)
                 .map { bam ->
                     def bai_paths = [
                         file("${bam}.bai"),
@@ -402,7 +402,7 @@ workflow {
             log.info "Using existing VCF files from Clair3 directories in: ${params.vcf}"
 
             // Look for VCF files in Clair3 subdirectories
-            existing_vcf_ch = Channel.fromPath("${params.vcf}/*_clair3/merge_output.vcf.gz", checkIfExists: true)
+            existing_vcf_ch = channel.fromPath("${params.vcf}/*_clair3/merge_output.vcf.gz", checkIfExists: true)
                 .map { vcf ->
                     log.info "Found existing Clair3 VCF file: ${vcf}"
                     def tbi_paths = [
@@ -425,9 +425,9 @@ workflow {
         log.info "Performing Variant Calling with Clair3"
 
         // Look for existing Clair3 VCFs to potentially reuse
-        existing_vcf_ch = Channel.empty()
+        existing_vcf_ch = channel.empty()
         if (file(params.vcf).exists()) {
-            existing_vcf_ch = Channel.fromPath("${params.vcf}/*_clair3/merge_output.vcf.gz", checkIfExists: false)
+            existing_vcf_ch = channel.fromPath("${params.vcf}/*_clair3/merge_output.vcf.gz", checkIfExists: false)
                 .map { vcf -> 
                     def tbi_paths = [
                         file("${vcf}.tbi"),
@@ -482,7 +482,7 @@ workflow {
     if (actuallySkipVariantFiltering) {
         log.info "Using existing filtered VCF files from: ${params.vcf}/filtered"
         
-        existing_filtered_vcf_ch = Channel.fromPath("${params.vcf}/filtered/*.{vcf,vcf.gz}", checkIfExists: true)
+        existing_filtered_vcf_ch = channel.fromPath("${params.vcf}/filtered/*.{vcf,vcf.gz}", checkIfExists: true)
             .map {
                 vcf -> log.info "Found existing filtered VCF file: ${vcf.name}"
                 def tbi_paths = [
@@ -503,9 +503,9 @@ workflow {
     } else {
         log.info "Filtering variants"
 
-        existing_filtered_vcf_ch = Channel.empty()
+        existing_filtered_vcf_ch = channel.empty()
         if (file("${params.vcf}/filtered").exists()) {
-            existing_filtered_vcf_ch = Channel.fromPath("${params.vcf}/filtered/*.{vcf,vcf.gz}", checkIfExists: false)
+            existing_filtered_vcf_ch = channel.fromPath("${params.vcf}/filtered/*.{vcf,vcf.gz}", checkIfExists: false)
                 .map { vcf -> 
                 def tbi_paths = [
                     file("${vcf}.tbi"),
